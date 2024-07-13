@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor // Membuat konstruktor yang menerima semua properti kelas sebagai parameter.
 @NoArgsConstructor // Membuat konstruktor tanpa parameter.
 @Entity // Menandakan bahwa kelas ini adalah entitas JPA yang akan dipetakan ke tabel database.
-@Table(name="user") // Menentukan nama tabel di database yang akan dipetakan ke kelas ini.
+@Table(name="app_user") // Menentukan nama tabel di database yang akan dipetakan ke kelas ini.
 @EntityListeners(AuditingEntityListener.class) // Menambahkan listener untuk mengaudit perubahan pada entitas ini.
 
 
