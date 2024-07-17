@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: dev
+    activate: dev
   servlet:
     multipart:
       max-file-size: 50MB
