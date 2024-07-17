@@ -23,18 +23,19 @@ import java.util.stream.Collectors;
 @AllArgsConstructor // Membuat konstruktor yang menerima semua properti kelas sebagai parameter.
 @NoArgsConstructor // Membuat konstruktor tanpa parameter.
 @Entity // Menandakan bahwa kelas ini adalah entitas JPA yang akan dipetakan ke tabel database.
-@Table(name="app_user") // Menentukan nama tabel di database yang akan dipetakan ke kelas ini.
+@Table(name="_user") // Menentukan nama tabel di database yang akan dipetakan ke kelas ini.
 @EntityListeners(AuditingEntityListener.class) // Menambahkan listener untuk mengaudit perubahan pada entitas ini.
 
 
 
 public class User implements UserDetails, Principal {
+
     @Id
     @GeneratedValue
     private Integer id;
-    private String firstName;
-    private String lastName;
-    private LocalDate dateOfBirth;
+    private String firstname;
+    private String lastname;
+    private LocalDate dateOfBrith;
 
     @Column(unique = true)
     private String email;
@@ -52,8 +53,6 @@ public class User implements UserDetails, Principal {
     @Column(insertable = false)
     private LocalDateTime lastModifiedDate;
 
-
-
     @Override
     public String getName() {
         return email;
@@ -63,7 +62,7 @@ public class User implements UserDetails, Principal {
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return this.roles
                 .stream()
-                .map(role -> new SimpleGrantedAuthority(role.getName()))
+                .map(r-> new SimpleGrantedAuthority(r.getName()))
                 .collect(Collectors.toList());
     }
 
@@ -96,7 +95,7 @@ public class User implements UserDetails, Principal {
     public boolean isEnabled() {
         return enabled;
     }
-    public String fullName(){
-        return firstName + " " + lastName;
+    private String fullName(){
+        return firstname + " " + lastname;
     }
 }

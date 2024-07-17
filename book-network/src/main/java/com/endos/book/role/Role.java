@@ -18,7 +18,6 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name="role")
 @EntityListeners(AuditingEntityListener.class)
 
 
@@ -33,8 +32,6 @@ public class Role {
     @ManyToMany(mappedBy="roles")
     @JsonIgnore
     private List<User> users;
-
-
 
     @CreatedDate
     @Column(nullable = false,updatable = false)
