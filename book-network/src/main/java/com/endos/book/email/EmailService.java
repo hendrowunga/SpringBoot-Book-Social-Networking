@@ -21,18 +21,12 @@ import static org.springframework.mail.javamail.MimeMessageHelper.MULTIPART_MODE
 @Slf4j
 @RequiredArgsConstructor
 public class EmailService {
+
     private final JavaMailSender mailSender;
     private final SpringTemplateEngine templateEngine;
 
     @Async
-    public void sendEmail(
-            String to,
-            String username,
-            EmailTemplateName emailTemplate,
-            String confirmationUrl,
-            String activationCode,
-            String subject
-    ) throws MessagingException {
+    public void sendEmail(String to, String username, EmailTemplateName emailTemplate, String confirmationUrl, String activationCode, String subject ) throws MessagingException {
         String templateName;
         if (emailTemplate == null) {
             templateName = "confirm-email";

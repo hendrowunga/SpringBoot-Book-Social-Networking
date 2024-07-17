@@ -23,6 +23,8 @@ public class JwtService {
     @Value("${application.security.jwt.expiration}")
     private long jwtExpiration;
 
+
+
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
@@ -36,28 +38,23 @@ public class JwtService {
         return generateToken(new HashMap<>(), userDetails);
     }
 
-    public String generateToken(
-            Map<String, Object> extraClaims,
-            UserDetails userDetails
+    public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails
     ) {
         return buildToken(extraClaims, userDetails, jwtExpiration);
     }
 
-    private String buildToken(
-            Map<String, Object> extraClaims,
-            UserDetails userDetails,
-            long expiration
-    ) {
+    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long jwtExpiration) {
+
         var authorities = userDetails.getAuthorities()
-                .stream().
-                map(GrantedAuthority::getAuthority)
+                .stream()
+                .map(GrantedAuthority::getAuthority)
                 .toList();
         return Jwts
                 .builder()
                 .setClaims(extraClaims)
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
                 .claim("authorities", authorities)
                 .signWith(getSignInKey())
                 .compact();

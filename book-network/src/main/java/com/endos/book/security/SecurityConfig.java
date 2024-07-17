@@ -20,19 +20,17 @@ import static org.springframework.security.config.http.SessionCreationPolicy.STA
 @RequiredArgsConstructor
 @EnableMethodSecurity(securedEnabled = true)
 
-
 public class SecurityConfig {
 
-    private final JwtFilter jwtFilter;
     private final AuthenticationProvider authenticationProvider;
-
+    private final JwtFilter jwtAuthFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception{
-        httpSecurity
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
+        http
                 .cors(withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(req ->
+                .authorizeHttpRequests(req->
                         req.requestMatchers(
                                         "/auth/**",
                                         "/v2/api-docs",
@@ -46,16 +44,16 @@ public class SecurityConfig {
                                         "/webjars/**",
                                         "/swagger-ui.html"
 
-                        )
-                                .permitAll()
+                        ).permitAll()
                                 .anyRequest()
-                                .authenticated()
-                )
+                                    .authenticated()
+                    )
                 .sessionManagement(session-> session.sessionCreationPolicy(STATELESS))
                 .authenticationProvider(authenticationProvider)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-        return httpSecurity.build();
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
     }
+
 
 
 }
