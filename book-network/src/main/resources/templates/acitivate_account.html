@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aktivasi Akun</title>
+    <title>Account Activation</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -41,12 +41,12 @@
 </head>
 <body>
 <div class="container">
-    <h1>Aktivasi Akun</h1>
-    <p class="greeting" th:text="'Hallo ' + ${username} + ','"></p>
-    <p>Terima kasih telah mendaftar! Silakan gunakan kode aktivasi berikut untuk mengaktifkan akun Anda:</p>
+    <h1>Account Activation</h1>
+    <p class="greeting" th:text="'Hello ' + ${username} + ','"></p>
+    <p>Thank you for signing up! Please use the following activation code to activate your account:</p>
     <div class="activation-code"><span th:text="${activation_code}"></span></div>
     <div class="activation-link">
-        <a th:href="${confirmationUrl}" target="_blank">Aktivasi Akun Kamu</a>
+        <a th:href="${confirmationUrl}" target="_blank">Activate your account</a>
     </div>
 </div>
 </body>
