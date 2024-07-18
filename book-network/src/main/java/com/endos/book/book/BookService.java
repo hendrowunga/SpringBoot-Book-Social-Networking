@@ -1,6 +1,7 @@
 package com.endos.book.book;
 
 import com.endos.book.common.PageResponse;
+import com.endos.book.exception.OperationNotPermittedException;
 import com.endos.book.history.BookTransactionHistory;
 import com.endos.book.history.BookTransactionHistoryRepository;
 import com.endos.book.user.User;
@@ -14,13 +15,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 import static com.endos.book.book.BookSpecification.withOwnerId;
 
 @Service
 @RequiredArgsConstructor
 public class BookService {
-    private final BookRepository bookRepsitory;
+    private final BookRepository bookRepository;
     private final BookTransactionHistoryRepository transactionHistoryRepository;
 
     private final BookMapper bookMapper;
@@ -29,12 +31,12 @@ public class BookService {
         User user = ((User) connectedUser.getPrincipal());
         Book book = bookMapper.toBook(request);
         book.setOwner(user);
-        return bookRepsitory.save(book).getId();
+        return bookRepository.save(book).getId();
 
     }
 
     public BookResponse findById(Integer bookId) {
-        return bookRepsitory.findById(bookId)
+        return bookRepository.findById(bookId)
                 .map(bookMapper::toBookResponse)
                 .orElseThrow(()-> new EntityNotFoundException("No book found with the ID :: " + bookId ));
     }
@@ -42,7 +44,7 @@ public class BookService {
     public PageResponse<BookResponse> findAllBooks(int page, int size, Authentication connectedUser) {
         User user = ((User) connectedUser.getPrincipal());
         Pageable pageable= PageRequest.of(page,size, Sort.by("createdDate").descending());
-        Page<Book> books=bookRepsitory.findAllDisplayableBooks(pageable,user.getId());
+        Page<Book> books=bookRepository.findAllDisplayableBooks(pageable,user.getId());
         List<BookResponse> bookResponse=books.stream()
                 .map(bookMapper::toBookResponse)
                 .toList();
@@ -60,7 +62,7 @@ public class BookService {
     public PageResponse<BookResponse> findAllBooksByOwner(int page, int size, Authentication connectedUser) {
         User user = ((User) connectedUser.getPrincipal());
         Pageable pageable= PageRequest.of(page,size, Sort.by("createdDate").descending());
-        Page<Book> books=bookRepsitory.findAll(withOwnerId(user.getId()),pageable);
+        Page<Book> books=bookRepository.findAll(withOwnerId(user.getId()),pageable);
 
         List<BookResponse> bookResponse=books.stream()
                 .map(bookMapper::toBookResponse)
@@ -110,5 +112,29 @@ public class BookService {
                 allBorrowedBooks.isFirst(),
                 allBorrowedBooks.isLast()
         );
+    }
+
+    public Integer updateShareableStatus(Integer bookId, Authentication connectedUser) {
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new EntityNotFoundException("No book found with ID:: " + bookId));
+        User user = ((User) connectedUser.getPrincipal());
+        if (!Objects.equals(book.getOwner().getId(), user.getId())) {
+            throw new OperationNotPermittedException("You cannot update others books shareable status");
+        }
+        book.setShareable(!book.isShareable());
+        bookRepository.save(book);
+        return bookId;
+    }
+
+    public Integer updateArchivedStatus(Integer bookId, Authentication connectedUser) {
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new EntityNotFoundException("No book found with ID:: " + bookId));
+        User user = ((User) connectedUser.getPrincipal());
+        if (!Objects.equals(book.getOwner().getId(), user.getId())) {
+            throw new OperationNotPermittedException("You cannot update others books archived status");
+        }
+        book.setArchived(!book.isArchived());
+        bookRepository.save(book);
+        return bookId;
     }
 }
