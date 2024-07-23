@@ -1,16 +1,19 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-// import {authGuard} from '../../services/guard/auth.guard';
+import {authGuard} from '../../services/guard/auth.guard';
 import { MainComponent } from './pages/main/main.component';
 import {BookListComponent} from './pages/book-list/book-list.component';
 import {MyBooksComponent} from './pages/my-books/my-books.component';
 import {ManageBookComponent} from './pages/manage-book/manage-book.component';
+import {BorrowedBookListComponent} from './pages/borrowed-book-list/borrowed-book-list.component';
+import {ReturnBooksComponent} from './pages/return-books/return-books.component';
+import {BookDetailsComponent} from './pages/book-details/book-details.component';
 
 const routes: Routes = [
   {
       path: '',
       component: MainComponent,
-//       canActivate: [authGuard],
+      canActivate: [authGuard],
       children:[
         {
           path: '',
@@ -18,18 +21,35 @@ const routes: Routes = [
           },
         {
           path: 'my-books',
-          component: MyBooksComponent
-//                 canActivate: [authGuard]
+          component: MyBooksComponent,
+                canActivate: [authGuard]
         },
+
+       {
+              path: 'my-borrowed-books',
+              component: BorrowedBookListComponent,
+              canActivate: [authGuard]
+            },
+          {
+              path: 'my-returned-books',
+              component: ReturnBooksComponent,
+              canActivate: [authGuard]
+            },
+
+          {
+                  path: 'details/:bookId',
+                  component: BookDetailsComponent,
+                  canActivate: [authGuard]
+                },
       {
         path: 'manage',
-        component: ManageBookComponent
-//                      canActivate: [authGuard]
+        component: ManageBookComponent,
+                     canActivate: [authGuard]
       },
     {
        path: 'manage/:bookId',
-       component: ManageBookComponent
-//        canActivate: [authGuard]
+       component: ManageBookComponent,
+       canActivate: [authGuard]
       }
         ]
   }
