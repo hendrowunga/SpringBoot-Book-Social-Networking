@@ -1,11 +1,6 @@
 package com.endos.book.user;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -29,13 +24,19 @@ public class Token {
 
     @Column(unique = true)
     private String token;
+    @Column(unique = true)
+    private String refreshToken;
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
-    private LocalDateTime validateAt;
+    private LocalDateTime refreshExpiresAt; // Masa kedaluwarsa untuk refresh token
+    private LocalDateTime validatedAt;
 
     @ManyToOne
-    @JoinColumn(name="userId",nullable = false)
+    @JoinColumn(name = "userId", nullable = false)
     private User user;
+
+    private boolean revoked; // Untuk menandakan apakah token ini sudah dicabut
+    private boolean expired; // Untuk menandakan apakah token ini sudah kadaluwarsa
 
 
 

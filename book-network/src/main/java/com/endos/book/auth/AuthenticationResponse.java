@@ -1,15 +1,14 @@
 package com.endos.book.auth;
 
+import lombok.*;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
-
-@Getter
-@Setter
+@Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class AuthenticationResponse {
 
-    private String token;
 
+    private String accessToken;
+    private String refreshToken;
 }

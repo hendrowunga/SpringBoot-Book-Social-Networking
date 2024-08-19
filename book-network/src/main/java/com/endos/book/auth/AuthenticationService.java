@@ -4,54 +4,123 @@ import com.endos.book.email.EmailService;
 import com.endos.book.email.EmailTemplateName;
 import com.endos.book.role.RoleRepository;
 import com.endos.book.security.JwtService;
-import com.endos.book.user.TokenRepository;
-import com.endos.book.user.User;
-import com.endos.book.user.Token;
-import com.endos.book.user.UserRepository;
+import com.endos.book.user.*;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.mail.MessagingException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.HashMap;
+import java.time.ZoneId;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
-
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
-    private final TokenRepository tokenRepository;
-    private final EmailService emailService;
-    private final AuthenticationManager authenticateManager;
+    private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final AuthenticationManager authenticationManager;
+    private final RoleRepository roleRepository;
+    private final EmailService emailService;
+    private final TokenRepository tokenRepository;
+
     @Value("${application.mailing.frontend.activation-url}")
     private String activationUrl;
 
-    public void register(RegistrationRequest request) throws MessagingException {
+    public AuthenticationResponse register(RegistrationRequest request) throws MessagingException {
+        // Temukan role "USER" dari role repository
         var userRole = roleRepository.findByName("USER")
-                // todo - better exception handling
                 .orElseThrow(() -> new IllegalStateException("ROLE USER was not initiated"));
+
+        // Buat user baru dan simpan ke repository
         var user = User.builder()
                 .firstname(request.getFirstname())
                 .lastname(request.getLastname())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .accountLocked(false)
-                .enabled(false)
-                .roles(List.of(userRole))
+                .enabled(false)  // Pengguna belum aktif
+                .roles(Set.of(userRole))  // Menggunakan Set
                 .build();
         userRepository.save(user);
+
+        // Kirim email verifikasi untuk aktivasi akun
         sendValidationEmail(user);
+
+        // Generate claims (jika diperlukan) dan JWT Token untuk pengguna yang baru didaftarkan
+        var claims = new HashMap<String, Object>();
+        claims.put("fullName", user.getFullName());
+
+        // Menghasilkan token JWT untuk user baru
+        var jwtToken = jwtService.generateToken(claims, user);
+        var refreshToken = jwtService.generateRefreshToken(user);
+
+        // Simpan token yang dihasilkan ke dalam basis data
+        saveUserToken(user, jwtToken, refreshToken);
+
+        // Mengembalikan AuthenticationResponse berisi token
+        return AuthenticationResponse.builder()
+                .accessToken(jwtToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
+
+
+    public AuthenticationResponse authenticate(AuthenticationRequest request) {
+        var auth = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getEmail(),
+                        request.getPassword()
+                )
+        );
+
+        var claims = new HashMap<String, Object>();
+        var user = (User) auth.getPrincipal();
+        claims.put("fullName", user.getFullName());
+
+        var accessToken = jwtService.generateToken(claims, user);
+        var refreshToken = generateRefreshToken();
+        saveUserToken(user, accessToken, refreshToken);
+
+        return AuthenticationResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
+
+
+    // Send Email
+    @Transactional
+    public void activateAccount(String token) throws MessagingException {
+        Token savedToken = tokenRepository.findByToken(token)
+                // todo exception has to be defined
+                .orElseThrow(() -> new RuntimeException("Invalid token"));
+        if (LocalDateTime.now().isAfter(savedToken.getExpiresAt())) {
+            sendValidationEmail(savedToken.getUser());
+            throw new RuntimeException("Activation token has expired. A new token has been send to the same email address");
+        }
+
+        var user = userRepository.findById(savedToken.getUser().getId())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        user.setEnabled(true);
+        userRepository.save(user);
+
+        savedToken.setValidatedAt(LocalDateTime.now());
+        tokenRepository.save(savedToken);
     }
 
     private void sendValidationEmail(User user) throws MessagingException {
@@ -59,23 +128,25 @@ public class AuthenticationService {
 
         emailService.sendEmail(
                 user.getEmail(),
-                user.fullName(),
+                user.getFullName(),
                 EmailTemplateName.ACTIVATE_ACCOUNT,
                 activationUrl,
                 newToken,
-                "Account activation");
+                "Account activation"
+        );
     }
 
     private String generateAndSaveActivationToken(User user) {
-        String generateToken = generateActivationCode(6);
-        var token = Token.builder()
-                .token(generateToken)
+        String generatedToken = generateActivationCode(6);
+        Token token = Token.builder()
+                .token(generatedToken)
                 .createdAt(LocalDateTime.now())
                 .expiresAt(LocalDateTime.now().plusMinutes(15))
                 .user(user)
                 .build();
         tokenRepository.save(token);
-        return generateToken;
+
+        return generatedToken;
     }
 
     private String generateActivationCode(int length) {
@@ -92,34 +163,63 @@ public class AuthenticationService {
         return codeBuilder.toString();
     }
 
-    public AuthenticationResponse authenticate(AuthenticationRequest request) {
 
-        var auth = authenticateManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()));
-        var claims = new HashMap<String, Object>();
-        var user = ((User) auth.getPrincipal());
-        claims.put("fullName", user.fullName());
-        var jwtToken = jwtService.generateToken(claims, user);
-        return AuthenticationResponse.builder().token(jwtToken).build();
+    // Refresh Token
+    // Save access and refresh tokens to the database
+    private void saveUserToken(User user, String accessToken, String refreshToken) {
+        Token tokenEntity = Token.builder()
+                .token(accessToken)
+                .refreshToken(refreshToken)
+                .createdAt(LocalDateTime.now())
+                .expiresAt(LocalDateTime.now().plusSeconds(jwtService.getJwtExpiration() / 1000)) // Atur masa berlaku token akses
+                .refreshExpiresAt(LocalDateTime.ofInstant(Instant.now().plusMillis(jwtService.getJwtRefreshTokenExpiration()), ZoneId.systemDefault()))
+                .validatedAt(LocalDateTime.now())
+                .user(user)
+                .revoked(false)
+                .expired(false)
+                .build();
+
+        tokenRepository.save(tokenEntity);
     }
 
-    // @Transactional
-    public void activateAccount(String token) throws MessagingException {
-        Token savedToken = tokenRepository.findByToken(token)
-                .orElseThrow(() -> new RuntimeException(("Invalid token")));
-        if (LocalDateTime.now().isAfter(savedToken.getExpiresAt())) {
-            sendValidationEmail((savedToken.getUser()));
-            throw new RuntimeException(
-                    "Activation token has expired. A new token has been send to the same email address");
-        }
-        var user = userRepository.findById(savedToken.getUser().getId())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-        user.setEnabled(true);
-        userRepository.save(user);
+    private void revokeAllUserTokens(User user) {
+        var validUserTokens = tokenRepository.findAllValidTokenByUser(user.getId());
+        if (validUserTokens.isEmpty())
+            return;
+        validUserTokens.forEach(token -> {
+            token.setExpired(true);
+            token.setRevoked(true);
+        });
+        tokenRepository.saveAll(validUserTokens);
+    }
 
-        savedToken.setValidateAt(LocalDateTime.now());
-        tokenRepository.save(savedToken);
+    public void refreshToken(
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) throws IOException {
+        final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        final String refreshToken;
+        final String userEmail;
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return;
+        }
+        refreshToken = authHeader.substring(7);
+        userEmail = jwtService.extractUsername(refreshToken);
+        if (userEmail != null) {
+            var user = this.userRepository.findByEmail(userEmail)
+                    .orElseThrow();
+            if (jwtService.isTokenValid(refreshToken, user) && !jwtService.isTokenExpired(refreshToken)) { // Memeriksa validitas dan kedaluwarsa
+                var accessToken = jwtService.generateToken(user);
+                var authResponse = AuthenticationResponse.builder()
+                        .accessToken(accessToken)
+                        .refreshToken(refreshToken)
+                        .build();
+                new ObjectMapper().writeValue(response.getOutputStream(), authResponse);
+            }
+        }
+    }
+
+    private String generateRefreshToken() {
+        return UUID.randomUUID().toString();
     }
 }

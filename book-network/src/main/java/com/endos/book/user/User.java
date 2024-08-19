@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Getter // Membuat getter otomatis untuk semua properti kelas ini.
@@ -37,7 +38,7 @@ public class User implements UserDetails, Principal {
     private Integer id;
     private String firstname;
     private String lastname;
-    private LocalDate dateOfBrith;
+    private LocalDate dateOfBirth;
 
     @Column(unique = true)
     private String email;
@@ -45,21 +46,23 @@ public class User implements UserDetails, Principal {
     private boolean accountLocked;
     private boolean enabled;
 
-    @ManyToMany(fetch = FetchType.EAGER)
-    private List<Role> roles;
-
-    @OneToMany(mappedBy = "owner")
-    private List<Book> books;
-
-    @OneToMany(mappedBy = "user")
-    private List<BookTransactionHistory> histories;
-
     @CreatedDate
-    @Column(nullable = false,updatable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdDate;
+
     @LastModifiedDate
     @Column(insertable = false)
     private LocalDateTime lastModifiedDate;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id"))
+    private Set<Role> roles;
+
+
+
 
     @Override
     public String getName() {
@@ -70,7 +73,7 @@ public class User implements UserDetails, Principal {
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return this.roles
                 .stream()
-                .map(r-> new SimpleGrantedAuthority(r.getName()))
+                .map(r -> new SimpleGrantedAuthority(r.getName()))
                 .collect(Collectors.toList());
     }
 
@@ -103,7 +106,10 @@ public class User implements UserDetails, Principal {
     public boolean isEnabled() {
         return enabled;
     }
-    public String fullName(){
+    public String fullName() {
+        return getFirstname() + " " + getLastname();
+    }
+    public String getFullName() {
         return firstname + " " + lastname;
     }
 }
